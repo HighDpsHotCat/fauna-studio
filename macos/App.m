@@ -82,7 +82,12 @@ static void progress(void *context,const wchar_t *message){
     const char *output=getenv("AAANIMAL_UI_SMOKE");
     NSBitmapImageRep *bitmap=[_window.contentView bitmapImageRepForCachingDisplayInRect:_window.contentView.bounds];
     [_window.contentView cacheDisplayInRect:_window.contentView.bounds toBitmapImageRep:bitmap];
-    NSData *png=[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+    /* cacheDisplay omits Metal layers and the NSWindow background. */
+    NSImage *capture=[[NSImage alloc] initWithSize:_window.contentView.bounds.size];[capture lockFocus];
+    [NSColor.windowBackgroundColor setFill];NSRectFill(_window.contentView.bounds);[bitmap drawInRect:_window.contentView.bounds];
+    NSRect sceneRect=[_viewer convertRect:_viewer.bounds toView:_window.contentView];
+    [[_viewer snapshot] drawInRect:sceneRect fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1];[capture unlockFocus];
+    NSData *png=[[NSBitmapImageRep imageRepWithData:capture.TIFFRepresentation] representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
     if(!png||![png writeToFile:[NSString stringWithUTF8String:output] atomically:YES]){fprintf(stderr,"UI smoke: capture failed\n");exit(1);}
     puts("PASS Cocoa window, controls, SceneKit scene and example model");[NSApp terminate:nil];
 }
