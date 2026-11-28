@@ -9,10 +9,10 @@ static int sha256(const wchar_t *path,char hex[65]){return fs_sha256_file(path,h
 int fs_generate(Job *job){
     wchar_t directory[FS_PATH],parent[FS_PATH],input[FS_PATH],mask[FS_PATH],prepared[FS_PATH],raw[FS_PATH],log[FS_PATH],path[FS_PATH];
     Photo photo={0},cutout={0},normalized={0},depth_photo={0};Mesh original={0},colored={0},reduced={0},observed={0};int ok=0;
-    cJSON *report=NULL;char *metadata=NULL;FsId id;job->error[0]=0;
+    cJSON *report=NULL;char *metadata=NULL;FsId id;job->error[0]=0;job->target=FS_FORM_BASE_TRIANGLES;
     if(!job->formats||(job->formats&~EXPORT_ALL)){fs_error(job->error,L"저장할 형식을 하나 이상 선택하세요.");return 0;}
     if((job->formats&(EXPORT_STL|EXPORT_STEP|EXPORT_3MF))&&(!isfinite(job->cad_size_mm)||job->cad_size_mm<1||job->cad_size_mm>10000)){fs_error(job->error,L"인쇄 파일 크기를 1~10,000 mm 사이로 입력하세요.");return 0;}
-    if(job->target<300||job->target>200000||(job->resolution!=192&&job->resolution!=256&&job->resolution!=320)){fs_error(job->error,L"삼각형 수 또는 추출 해상도가 잘못되었습니다.");return 0;}
+    if((job->resolution!=192&&job->resolution!=256&&job->resolution!=320)){fs_error(job->error,L"추출 해상도가 잘못되었습니다.");return 0;}
     if(!job->output[0]&&!fs_default_output(job->output))return 0;
     if(fs_exists(job->output)){fs_error(job->error,L"결과 폴더가 이미 있습니다. 새 폴더 이름을 사용하세요.");return 0;}
     fs_wcopy(parent,FS_PATH,job->output);fs_parent(parent);
@@ -82,7 +82,7 @@ int fs_generate(Job *job){
     cJSON_AddNumberToObject(report,"shapeFrontSilhouetteIoU",job->shape_iou);
     cJSON_AddNumberToObject(report,"shapeDepthRatio",job->shape_depth_ratio);
     cJSON_AddStringToObject(report,"referenceUse","C-selected palette, up to 15 percent blend on unseen rear only; original front colours preserved; see references.json");
-    cJSON_AddStringToObject(report,"style","faceted-form-no-eyes-v2");
+    cJSON_AddStringToObject(report,"style","faceted-form-auto-v3");
     cJSON_AddNumberToObject(report,"eyeRegionsSuppressed",job->eye_regions);
     cJSON_AddNumberToObject(report,"eyeColourVerticesChanged",job->eye_colour_vertices);
     cJSON_AddBoolToObject(report,"uniformCoatFallback",job->eye_colour_fallback);
@@ -110,7 +110,11 @@ int fs_generate(Job *job){
     cJSON_AddStringToObject(report,"referenceStatus",job->reference_count>=2?"ready":(job->reference_count?"limited":"input_only"));
     cJSON_AddNumberToObject(report,"referenceColourBlend",job->reference_count>=2?.15:(job->reference_count?.075:0));
     cJSON_AddNumberToObject(report,"extractionResolution",job->resolution);
-    cJSON_AddNumberToObject(report,"requestedTriangles",job->target);cJSON_AddNumberToObject(report,"originalTriangles",original.triangle_count);
+    cJSON_AddStringToObject(report,"polygonControl","automatic");
+    cJSON_AddNumberToObject(report,"automaticBaseTriangles",FS_FORM_BASE_TRIANGLES);
+    cJSON_AddNumberToObject(report,"automaticMaxTriangles",FS_FORM_MAX_TRIANGLES);
+    cJSON_AddBoolToObject(report,"styleBudgetLimited",job->style_budget_limited);
+    cJSON_AddNumberToObject(report,"originalTriangles",original.triangle_count);
     cJSON_AddNumberToObject(report,"resultTriangles",result->triangle_count);cJSON_AddNumberToObject(report,"minimumSilhouetteIoU",job->quality.silhouette_iou);
     cJSON_AddNumberToObject(report,"maximumDepthRMSE",job->quality.depth_rmse);cJSON_AddBoolToObject(report,"keptOriginal",job->kept_original);
     cJSON_AddStringToObject(report,"qualityMeaning","simplification preservation of completed geometry, not accuracy against a real animal");

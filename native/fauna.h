@@ -6,6 +6,9 @@
 
 #define FS_PATH 4096
 #define FS_ERROR 512
+/* Product style policy; never supplied by the UI or generation CLI. */
+#define FS_FORM_BASE_TRIANGLES 900u
+#define FS_FORM_MAX_TRIANGLES 2400u
 typedef struct {
     float p[3], n[3]; unsigned char color[4]; float detail;
     /* Reference image coordinates survive source-proportion deformation. */
@@ -46,6 +49,7 @@ typedef struct {
     Quality quality;
     uint32_t original_triangles, final_triangles;
     int kept_original;
+    int style_budget_limited;
     int eye_regions,eye_colour_vertices,eye_colour_fallback;
     int reference_count;
     int shape_disabled, shape_used;

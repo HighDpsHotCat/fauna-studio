@@ -373,25 +373,29 @@ failed:mesh_free(&conditioned);mesh_free(out);return 0;
 /* Broad, planar forms without the legacy eye refinement or 20k face floor. */
 int mesh_form_surface(const Mesh *source,Mesh *out,Job *j){
     Mesh conditioned={0};memset(out,0,sizeof(*out));j->kept_original=0;
-    if(j->target<300||j->target>200000||!mesh_validate(source,j->error))return 0;
+    j->target=FS_FORM_BASE_TRIANGLES;j->style_budget_limited=0;
+    if(!mesh_validate(source,j->error))return 0;
     if(!mesh_copy(source,&conditioned)){fs_error(j->error,L"로우폴리 메모리가 부족합니다.");return 0;}
     if(!remove_surface_specks(&conditioned,j->cancel,j->error)||!condition_surface(&conditioned,j->cancel,j->error))goto fail;
-    /* Coarser planes may deviate in depth while six-view outlines still
-     * retain the ears, muzzle and feet. Do not restore dense fur geometry. */
-    uint32_t budget=j->target;
-    for(int attempt=0;attempt<8;attempt++){
-        if(fs_cancelled(j)||!mesh_copy(&conditioned,out))goto fail;
-        if(!mesh_simplify(out,budget,j->cancel,j->error))goto fail;
+    /* One species-independent style policy. Start with broad planes and add
+     * only enough faces to retain silhouette/depth. Never fall back to the
+     * dense AI surface, which would silently change the requested style. */
+    const uint32_t budgets[]={FS_FORM_BASE_TRIANGLES,1350,1800,FS_FORM_MAX_TRIANGLES};
+    for(unsigned attempt=0;attempt<sizeof(budgets)/sizeof(budgets[0]);attempt++){
+        if(fs_cancelled(j))goto fail;
+        if(!mesh_copy(&conditioned,out)){fs_error(j->error,L"로우폴리 메모리가 부족합니다.");goto fail;}
+        if(!mesh_simplify(out,budgets[attempt],j->cancel,j->error))goto fail;
+        if(out->triangle_count>FS_FORM_MAX_TRIANGLES){
+            fs_error(j->error,L"표면 연결이 복잡해 자동 로우폴리로 정리하지 못했습니다. 배경이 단순한 전신 사진을 사용하세요.");goto fail;
+        }
         j->quality=mesh_compare(&conditioned,out);
         if(j->quality.silhouette_iou>=.94&&j->quality.depth_rmse<=.05)break;
-        mesh_free(out);
-        if(budget>=conditioned.triangle_count||attempt==7){
-            if(!mesh_copy(&conditioned,out))goto fail;j->kept_original=1;j->quality=mesh_compare(&conditioned,out);break;
+        if(attempt+1==sizeof(budgets)/sizeof(budgets[0])||budgets[attempt]>=conditioned.triangle_count){
+            j->style_budget_limited=1;break;
         }
-        budget=(uint32_t)fmin(conditioned.triangle_count,ceil(budget*1.5));
+        mesh_free(out);
     }
-    /* Each triangle stores one colour and one geometric normal. No original
-     * photo reprojection may follow this step: it would restore the eyes. */
+    /* Each exported triangle has one colour and its real geometric normal. */
     if(fs_cancelled(j)||!mesh_facets(out,j->error))goto fail;
     mesh_free(&conditioned);return 1;
 fail:mesh_free(&conditioned);mesh_free(out);return 0;

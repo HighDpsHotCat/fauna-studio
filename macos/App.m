@@ -12,7 +12,7 @@ static void fixedHeight(NSView *v,CGFloat h){[v.heightAnchor constraintEqualToCo
 static void fullWidth(NSView *v,NSView *parent){[v.widthAnchor constraintEqualToAnchor:parent.widthAnchor].active=YES;}
 
 @interface Studio : NSObject <NSApplicationDelegate,NSWindowDelegate> {
-    NSWindow *_window;NSImageView *_photo;SCNView *_viewer;NSTextField *_filename,*_target,*_mm,*_status,*_count;
+    NSWindow *_window;NSImageView *_photo;SCNView *_viewer;NSTextField *_filename,*_style,*_mm,*_status,*_count;
     NSPopUpButton *_quality;NSButton *_references,*_generate,*_cancel,*_save,*_open,*_browse,*_example,*_folder;
     NSArray<NSButton*> *_formats;NSString *_input,*_lastOutput;wchar_t _root[FS_PATH];Mesh _mesh;
     BOOL _busy,_terminateAfterJob;FsCancel *_cancelToken;
@@ -38,8 +38,8 @@ static void progress(void *context,const wchar_t *message){
     _photo=[NSImageView new];_photo.imageScaling=NSImageScaleProportionallyUpOrDown;fixedHeight(_photo,178);
     _filename=label(@"사진을 선택하세요",NO);_filename.lineBreakMode=NSLineBreakByTruncatingMiddle;
     _browse=[self button:@"사진 첨부…" action:@selector(browse:)];_example=[self button:@"예제 사진" action:@selector(example:)];
-    NSButton *qualityHelp=[self button:@"?" action:@selector(qualityHelp:)];qualityHelp.bezelStyle=NSBezelStyleHelpButton;qualityHelp.toolTip=@"목표 폴리곤 수와 품질 안내";
-    _target=[NSTextField textFieldWithString:@"900"];[_target.widthAnchor constraintEqualToConstant:100].active=YES;
+    NSButton *qualityHelp=[self button:@"?" action:@selector(qualityHelp:)];qualityHelp.bezelStyle=NSBezelStyleHelpButton;qualityHelp.toolTip=@"자동 로우폴리와 품질 안내";
+    _style=label(@"각진 로우폴리 · 자동",NO);
     _quality=[NSPopUpButton new];[_quality addItemsWithTitles:@[@"빠르게 · 192",@"고품질 · 256",@"세밀하게 · 320"]];[_quality selectItemAtIndex:2];
     _references=[NSButton checkboxWithTitle:@"유사 자세 참고로 형태 보완" target:nil action:nil];_references.state=NSControlStateValueOn;
     NSButton *formatHelp=[self button:@"?" action:@selector(formatHelp:)];formatHelp.bezelStyle=NSBezelStyleHelpButton;formatHelp.toolTip=@"저장 형식 안내";
@@ -51,8 +51,8 @@ static void progress(void *context,const wchar_t *message){
     _status=label(@"준비됨",NO);_status.maximumNumberOfLines=3;_status.lineBreakMode=NSLineBreakByWordWrapping;fixedHeight(_status,64);
     _folder=[self button:@"저장 폴더 열기" action:@selector(folder:)];_folder.enabled=NO;
     NSStackView *left=stack(@[stack(@[label(@"사진 입력",YES),_example],NSUserInterfaceLayoutOrientationHorizontal),_photo,_browse,_filename,
-        stack(@[label(@"목표 폴리곤 수 / 품질",YES),qualityHelp],NSUserInterfaceLayoutOrientationHorizontal),
-        stack(@[_target,_quality],NSUserInterfaceLayoutOrientationHorizontal),_references,
+        stack(@[label(@"모델 스타일 / 품질",YES),qualityHelp],NSUserInterfaceLayoutOrientationHorizontal),
+        stack(@[_style,_quality],NSUserInterfaceLayoutOrientationHorizontal),_references,
         stack(@[label(@"저장 형식",YES),formatHelp],NSUserInterfaceLayoutOrientationHorizontal),stack(_formats,NSUserInterfaceLayoutOrientationHorizontal),
         stack(@[label(@"인쇄 크기 · 긴 변 (mm)",NO),_mm],NSUserInterfaceLayoutOrientationHorizontal),_generate,_cancel,_status,_folder],NSUserInterfaceLayoutOrientationVertical);
     [left.widthAnchor constraintEqualToConstant:286].active=YES;
@@ -91,23 +91,23 @@ static void progress(void *context,const wchar_t *message){
     if(!png||![png writeToFile:[NSString stringWithUTF8String:output] atomically:YES]){fprintf(stderr,"UI smoke: capture failed\n");exit(1);}
     puts("PASS Cocoa window, controls, SceneKit scene and example model");[NSApp terminate:nil];
 }
-- (void)qualityHelp:(id)sender {(void)sender;[self alert:@"목표 폴리곤 수 / 품질" text:@"몸체와 얼굴을 각진 로우폴리 면으로 표현합니다. 귀·이마·콧대·코·입·턱의 큰 형태를 남기며 눈 무늬는 지웁니다.\n권장 시작값은 900면입니다. 600~1,200면에서 큰 면과 각이 강조됩니다. 귀·주둥이·발 윤곽을 보호하면 면 수가 늘어날 수 있습니다. 얼굴 위치가 불확실하면 단색 털색을 사용합니다.\n품질 수치가 높으면 TripoSR에서 더 세밀한 표면을 추출하지만 시간과 메모리가 더 필요합니다."];}
+- (void)qualityHelp:(id)sender {(void)sender;[self alert:@"모델 스타일 / 품질" text:@"모든 동물에 같은 각진 로우폴리 스타일을 적용합니다.\n면 수는 프로그램이 자동으로 정합니다. 귀·주둥이·턱·발 등 큰 형태를 살리며 눈 무늬는 지웁니다. 얼굴 위치가 불확실하면 단색 털색을 사용합니다.\n품질은 사진에서 형상을 추출하는 정밀도입니다. 높이면 처리 시간이 늘어나며, 최종 스타일은 각진 로우폴리로 유지됩니다."];}
 - (void)formatHelp:(id)sender {(void)sender;[self alert:@"저장 형식" text:@"여러 개를 선택할 수 있습니다. 생성된 모델은 다시 생성하지 않고 다른 형식으로 저장할 수 있습니다.\nGLB: 색상이 있는 3D 모델\nSTL: 색상 없는 삼각형 메시\nSTEP: 색상 없는 삼각면 기반 CAD 형상\n3MF: 크기·색상을 포함하는 3D 인쇄 파일\n3MF 색상 지원은 슬라이서·프린터에 따라 다릅니다. G-code는 슬라이서에서 만드세요."];}
 - (void)setInput:(NSURL*)url {_input=url.path;_photo.image=[[NSImage alloc] initWithContentsOfURL:url];_filename.stringValue=url.lastPathComponent;}
 - (void)browse:(id)sender {(void)sender;NSOpenPanel *p=[NSOpenPanel openPanel];p.allowedFileTypes=@[@"jpg",@"jpeg",@"png",@"webp",@"heic",@"tiff"];p.allowsMultipleSelection=NO;p.canChooseDirectories=NO;[p beginSheetModalForWindow:_window completionHandler:^(NSModalResponse result){if(result==NSModalResponseOK)[self setInput:p.URL];}];}
 - (void)example:(id)sender {(void)sender;[self setInput:[NSURL fileURLWithPath:[stringW(_root) stringByAppendingPathComponent:@"assets/red-fox.jpg"]]];}
 - (void)progress:(NSString*)message {_status.stringValue=message;}
 - (void)setBusy:(BOOL)busy {
-    _busy=busy;for(NSControl *c in @[_browse,_example,_open,_generate,_target,_quality,_references,_mm])c.enabled=!busy;
+    _busy=busy;for(NSControl *c in @[_browse,_example,_open,_generate,_quality,_references,_mm])c.enabled=!busy;
     for(NSButton *c in _formats)c.enabled=!busy;_cancel.enabled=busy;_save.enabled=!busy&&_mesh.triangle_count>0;
 }
 - (Job*)job {
     Job *j=calloc(1,sizeof(*j));if(!j){[self alert:@"메모리 부족" text:@"다른 작업을 닫고 다시 시도하세요."];return NULL;}
     fs_wcopy(j->root,FS_PATH,_root);if(_input&&!pathWide(_input,j->input)){free(j);return NULL;}
-    j->target=(uint32_t)_target.integerValue;j->resolution=(uint32_t[]){192,256,320}[_quality.indexOfSelectedItem];
+    j->target=FS_FORM_BASE_TRIANGLES;j->resolution=(uint32_t[]){192,256,320}[_quality.indexOfSelectedItem];
     j->cad_size_mm=_mm.doubleValue;j->shape_disabled=_references.state!=NSControlStateValueOn;
     for(NSUInteger i=0;i<_formats.count;i++)if(_formats[i].state==NSControlStateValueOn)j->formats|=1u<<i;
-    if(!j->formats||j->target<300||j->target>200000||!isfinite(j->cad_size_mm)||j->cad_size_mm<1||j->cad_size_mm>10000){free(j);[self alert:@"입력을 확인하세요" text:@"저장 형식을 하나 이상 선택하세요. 목표 폴리곤은 300~200,000, 인쇄 크기는 1~10,000 mm입니다."];return NULL;}
+    if(!j->formats||!isfinite(j->cad_size_mm)||j->cad_size_mm<1||j->cad_size_mm>10000){free(j);[self alert:@"입력을 확인하세요" text:@"저장 형식을 하나 이상 선택하세요. 인쇄 크기는 1~10,000 mm입니다."];return NULL;}
     j->cancel=fs_cancel_create(NULL,1,0,NULL);if(!j->cancel){free(j);return NULL;}j->progress=progress;j->context=(__bridge void*)self;return j;
 }
 - (void)work:(BOOL)generate {

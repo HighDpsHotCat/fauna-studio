@@ -275,7 +275,7 @@ static void volume_fallback(const Mesh *source){
 }
 
 static void form_style(const Mesh *mesh){
-    Job j={0};j.target=900;Mesh input={0},prepared={0},out={0};Photo photo={0};assert(mesh_copy(mesh,&input));
+    Job j={0};j.target=200000;Mesh input={0},prepared={0},out={0};Photo photo={0};assert(mesh_copy(mesh,&input));
     photo.width=photo.height=100;photo.rgba=malloc(40000);assert(photo.rgba);
     for(int y=0;y<100;y++)for(int x=0;x<100;x++){unsigned char *c=photo.rgba+4*(y*100+x);c[0]=170;c[1]=120;c[2]=70;c[3]=255;if((abs(x-35)<5||abs(x-65)<5)&&abs(y-40)<4)c[0]=c[1]=c[2]=5;}
     for(uint32_t i=0;i<input.vertex_count;i++){Vertex *v=&input.vertices[i];v->face=v->smooth=1;v->observed=1;v->detail=8;v->source_uv[0]=.1f;v->source_uv[1]=.9f;}
@@ -287,8 +287,11 @@ static void form_style(const Mesh *mesh){
     for(int i=0;i<2;i++){assert(prepared.vertices[i].color[0]==170&&prepared.vertices[i].color[1]==120&&prepared.vertices[i].color[2]==70);assert(!memcmp(input.vertices[i].p,prepared.vertices[i].p,12));}
     assert(input.vertices[0].color[0]==5);assert(!memcmp(input.vertices[2].color,prepared.vertices[2].color,4));
     for(uint32_t i=0;i<prepared.vertex_count;i++)assert(!prepared.vertices[i].observed&&!prepared.vertices[i].face&&!prepared.vertices[i].smooth&&!prepared.vertices[i].detail);
-    assert(mesh_form_surface(&prepared,&out,&j));assert(out.triangle_count>=j.target&&out.triangle_count<4096);assert(out.vertex_count==3*out.triangle_count);
+    assert(mesh_form_surface(&prepared,&out,&j));assert(j.target==FS_FORM_BASE_TRIANGLES);assert(out.triangle_count>=j.target&&out.triangle_count<=FS_FORM_MAX_TRIANGLES);assert(out.vertex_count==3*out.triangle_count);
     for(uint32_t i=0;i<out.triangle_count;i++){const Vertex *a=&out.vertices[out.triangles[i].v[0]];for(int k=1;k<3;k++){const Vertex *b=&out.vertices[out.triangles[i].v[k]];assert(!memcmp(a->color,b->color,4));assert(!memcmp(a->n,b->n,12));}}
+    Job automatic={0};Mesh repeat={0};assert(mesh_form_surface(&prepared,&repeat,&automatic));
+    assert(automatic.target==j.target&&repeat.triangle_count==out.triangle_count);
+    assert(!memcmp(repeat.vertices,out.vertices,(size_t)out.vertex_count*sizeof(Vertex)));mesh_free(&repeat);
     assert(mesh_write_step(L"test-form.step",&out,100,NULL,j.error));assert(fs_unlink(L"test-form.step"));
     assert(mesh_write_glb(L"test-form.glb",&out,"{}",j.error));Mesh read={0};assert(mesh_read_glb(L"test-form.glb",&read,j.error));
     for(uint32_t i=0;i<out.vertex_count;i++)assert(!memcmp(out.vertices[i].color,read.vertices[i].color,4));mesh_free(&read);assert(fs_unlink(L"test-form.glb"));
@@ -296,7 +299,7 @@ static void form_style(const Mesh *mesh){
     for(uint32_t i=1;i<prepared.vertex_count;i++)assert(!memcmp(prepared.vertices[0].color,prepared.vertices[i].color,3));mesh_free(&prepared);
     j.cancel=fs_cancel_create(NULL,1,1,NULL);assert(!mesh_form_model(&j,directory,&photo,&input,&out));fs_cancel_free(j.cancel);
     assert(fs_unlink(path));assert(fs_rmdir(directory));photo_free(&photo);mesh_free(&input);
-    puts("PASS eye paint removal, unchanged source/coat outside mask, explicit no-landmark fallback, low face budget, flat stored normals/colours, STEP and cancellation");
+    puts("PASS eye paint removal, unchanged source/coat outside mask, explicit no-landmark fallback, automatic bounded face budget regardless of caller target, flat stored normals/colours, STEP and cancellation");
 }
 
 int main(void){fs_init();

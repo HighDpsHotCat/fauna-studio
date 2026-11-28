@@ -31,7 +31,7 @@ bash run.command
 ## 사용
 
 1. 사진을 첨부하거나 예제 사진을 선택합니다.
-2. 목표 폴리곤 수와 품질을 정합니다. 기본 목표는 900면입니다. 귀·주둥이·발·윤곽 보호에 필요한 경우 목표보다 많은 삼각형을 유지합니다.
+2. 모델 스타일은 **각진 로우폴리 · 자동**으로 고정됩니다. 면 수 입력은 없으며, 필요하면 사진의 형상 추출 품질만 선택합니다.
 3. GLB, STL, STEP, 3MF 중 필요한 형식을 체크하고 **3D 생성하기**를 누릅니다.
 4. 이미 만들어진 모델은 **GLB 열기… → 형식 체크 → 선택 형식으로 저장**으로 재생성 없이 변환합니다.
 
@@ -57,7 +57,7 @@ STL·STEP·3MF의 긴 변 길이는 mm로 지정합니다. 실제 프린터용 G
 이미 만든 모델에 새 스타일을 적용하는 개발 명령(결과 폴더의 `input-analysis.json`과 원본 배경 분리 사진 필요):
 
 ```bash
-build/aaanimal-cli --form model.glb --context RESULT_DIRECTORY --photo cutout.rgba --target 900 NEW_OUTPUT.glb
+build/aaanimal-cli --form model.glb --context RESULT_DIRECTORY --photo cutout.rgba NEW_OUTPUT.glb
 ```
 
 ## 구성과 발표 설명
@@ -100,7 +100,7 @@ build/aaanimal-cli --inspect examples/red-fox-lowpoly-3000.glb
 build/aaanimal-cli --export-stl examples/red-fox-lowpoly-3000.glb /tmp/animal.stl --size-mm 100
 build/aaanimal-cli --export-step examples/red-fox-lowpoly-3000.glb /tmp/animal.step
 build/aaanimal-cli --export-3mf examples/red-fox-lowpoly-3000.glb /tmp/animal.3mf
-build/aaanimal-cli --generate --input assets/red-fox.jpg --target 900 --resolution 320 --formats glb,stl,step,3mf
+build/aaanimal-cli --generate --input assets/red-fox.jpg --resolution 320 --formats glb,stl,step,3mf
 ctest --test-dir build --output-on-failure
 .venv/bin/python tools/check_runtime.py
 ```
@@ -116,6 +116,10 @@ CLI의 출력 파일·지정 출력 폴더는 아직 존재하지 않는 이름�
 
 개인 입력 사진, 생성 작업 기록, 가중치, 가상환경, 플랫폼별 빌드 결과는 버전 관리에 포함하지 않습니다.
 
-## 더 큰 면의 로우폴리
+## 자동 로우폴리 스타일
 
-현재 `faceted-form-no-eyes-v2`의 기본 목표는 900면입니다. 600~1,200면에서 큰 평면이 강조됩니다. 여섯 방향의 윤곽 IoU 0.94를 유지하면서 깊이 RMSE 한도를 0.05로 조정해 곡면을 촘촘하게 복원하던 면 증가를 줄였습니다. 눈 없는 표현과 면별 평면 법선은 유지하며, GLB뿐 아니라 STL·STEP·3MF에도 실제로 줄인 형상을 저장합니다. 사진 추론을 다시 실행하지 않고 코기 기존 형상을 처리한 결과는 v1 2,700면 → v2 1,350면입니다(요청 900, 최소 윤곽 IoU 0.966887 / 최대 깊이 RMSE 0.045720). 이 지표는 원래 메시 대비 보존도입니다.
+`faceted-form-auto-v3`는 Windows·Mac에서 면 수 입력을 제거하고, 모든 동물에 동일한 C 후처리를 적용합니다. 눈 무늬 없는 얼굴, 큰 삼각형 면, 실제 면별 평면 법선과 색을 유지합니다. 품질 선택은 TripoSR 추출 정밀도이며 최종 스타일을 변경하지 않습니다.
+
+내부 기준은 900면에서 시작해 여섯 방향 윤곽 IoU 0.94 / 깊이 RMSE 0.05를 만족하는 가장 작은 후보를 선택합니다(900 → 1,350 → 1,800 → 최대 2,400). 이는 사용자 설정이 아닙니다. 상한에서도 보존 목표를 충족하지 못하면 각진 스타일을 유지하고 `styleBudgetLimited`에 기록합니다. 안전하게 상한까지 줄일 수 없는 표면은 오류로 알리며, 조밀한 원형을 최종 모델로 조용히 대체하지 않습니다. 가려진 부분과 정확한 개체 형상은 여전히 입력 사진·TripoSR 추론의 영향을 받습니다.
+
+코기·고양이·여우의 기존 추론 형상에 동일한 자동 정책을 적용한 결과는 각각 1,350 / 900 / 900면입니다. 코기는 직전 각진 버전과 같은 형상을 유지했습니다. 이 검증에서는 AI를 재실행하지 않았습니다. 생성·`--form` 명령도 면 수 옵션을 받지 않습니다. `--simplify`·`--lowpoly`·`--surface`는 기존 개발용 메시 진단 명령이며 앱 생성 흐름에 사용하지 않습니다.
