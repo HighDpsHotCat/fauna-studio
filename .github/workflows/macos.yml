@@ -28,7 +28,14 @@ jobs:
           build/aaanimal-cli --export-stl examples/red-fox-lowpoly-3000.glb build/example.stl
           build/aaanimal-cli --export-step examples/red-fox-lowpoly-3000.glb build/example.step
           build/aaanimal-cli --export-3mf examples/red-fox-lowpoly-3000.glb build/example.3mf
+      - name: Launch native window with example model
+        run: AAANIMAL_UI_SMOKE="$PWD/build/macos-preview.png" './build/AAAnimal Studio.app/Contents/MacOS/AAAnimal Studio'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-${{ matrix.os }}
+          path: build/macos-preview.png
       - name: Verify AI dependency compatibility without downloading models
+        if: success() || failure()
         run: |
           python -m pip install -r ai/requirements.txt
           python -m pip check

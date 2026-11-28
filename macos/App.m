@@ -5,7 +5,7 @@
 #include <math.h>
 
 static NSString *stringW(const wchar_t *s){char b[FS_PATH*4];return fs_encode_utf8(0,0,s,-1,b,sizeof(b),NULL,NULL)?[NSString stringWithUTF8String:b]:@"";}
-static int wide(NSString *s,wchar_t *out){return fs_decode_utf8(0,0,s.UTF8String,-1,out,FS_PATH)>0;}
+static int pathWide(NSString *s,wchar_t *out){return fs_decode_utf8(0,0,s.UTF8String,-1,out,FS_PATH)>0;}
 static NSTextField *label(NSString *s,BOOL bold){NSTextField *v=[NSTextField labelWithString:s];v.font=bold?[NSFont boldSystemFontOfSize:15]:[NSFont systemFontOfSize:13];return v;}
 static NSStackView *stack(NSArray<NSView*> *views,NSUserInterfaceLayoutOrientation direction){NSStackView *s=[NSStackView stackViewWithViews:views];s.orientation=direction;s.spacing=10;s.alignment=direction==NSUserInterfaceLayoutOrientationVertical?NSLayoutAttributeLeading:NSLayoutAttributeCenterY;return s;}
 static void fixedHeight(NSView *v,CGFloat h){[v.heightAnchor constraintEqualToConstant:h].active=YES;}
@@ -72,6 +72,19 @@ static void progress(void *context,const wchar_t *message){
         [right.leadingAnchor constraintEqualToAnchor:left.trailingAnchor constant:24],[right.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-20],
         [right.topAnchor constraintEqualToAnchor:content.topAnchor constant:20],[right.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-20]]];
     [self displayMesh];[_window center];[_window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
+    if(getenv("AAANIMAL_UI_SMOKE"))dispatch_after(dispatch_time(DISPATCH_TIME_NOW,2*NSEC_PER_SEC),dispatch_get_main_queue(),^{[self smokeTest];});
+}
+- (void)smokeTest {
+    wchar_t path[FS_PATH],error[FS_ERROR]={0};fs_join(path,_root,L"examples/red-fox-lowpoly-3000.glb");
+    if(!mesh_read_glb(path,&_mesh,error)){fprintf(stderr,"UI smoke: example load failed\n");exit(1);}
+    [self example:nil];[self displayMesh];[_window.contentView layoutSubtreeIfNeeded];
+    if(_viewer.bounds.size.width<500||_viewer.bounds.size.height<300||!_viewer.scene||_mesh.triangle_count!=3000){fprintf(stderr,"UI smoke: invalid layout or scene\n");exit(1);}
+    const char *output=getenv("AAANIMAL_UI_SMOKE");
+    NSBitmapImageRep *bitmap=[_window.contentView bitmapImageRepForCachingDisplayInRect:_window.contentView.bounds];
+    [_window.contentView cacheDisplayInRect:_window.contentView.bounds toBitmapImageRep:bitmap];
+    NSData *png=[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+    if(!png||![png writeToFile:[NSString stringWithUTF8String:output] atomically:YES]){fprintf(stderr,"UI smoke: capture failed\n");exit(1);}
+    puts("PASS Cocoa window, controls, SceneKit scene and example model");[NSApp terminate:nil];
 }
 - (void)qualityHelp:(id)sender {(void)sender;[self alert:@"목표 폴리곤 수 / 품질" text:@"목표는 삼각형 개수입니다. 윤곽·얼굴·발을 보호해야 할 때는 면 수를 늘립니다.\n품질 수치가 높으면 TripoSR에서 더 세밀한 표면을 추출하지만 시간과 메모리가 더 필요합니다."];}
 - (void)formatHelp:(id)sender {(void)sender;[self alert:@"저장 형식" text:@"여러 개를 선택할 수 있습니다. 생성된 모델은 다시 생성하지 않고 다른 형식으로 저장할 수 있습니다.\nGLB: 색상이 있는 3D 모델\nSTL: 색상 없는 삼각형 메시\nSTEP: 색상 없는 삼각면 기반 CAD 형상\n3MF: 크기·색상을 포함하는 3D 인쇄 파일\n3MF 색상 지원은 슬라이서·프린터에 따라 다릅니다. G-code는 슬라이서에서 만드세요."];}
@@ -85,7 +98,7 @@ static void progress(void *context,const wchar_t *message){
 }
 - (Job*)job {
     Job *j=calloc(1,sizeof(*j));if(!j){[self alert:@"메모리 부족" text:@"다른 작업을 닫고 다시 시도하세요."];return NULL;}
-    fs_wcopy(j->root,FS_PATH,_root);if(_input&&!wide(_input,j->input)){free(j);return NULL;}
+    fs_wcopy(j->root,FS_PATH,_root);if(_input&&!pathWide(_input,j->input)){free(j);return NULL;}
     j->target=(uint32_t)_target.integerValue;j->resolution=(uint32_t[]){192,256,320}[_quality.indexOfSelectedItem];
     j->cad_size_mm=_mm.doubleValue;j->shape_disabled=_references.state!=NSControlStateValueOn;
     for(NSUInteger i=0;i<_formats.count;i++)if(_formats[i].state==NSControlStateValueOn)j->formats|=1u<<i;
@@ -113,7 +126,7 @@ static void progress(void *context,const wchar_t *message){
 - (void)open:(id)sender {
     (void)sender;NSOpenPanel *p=[NSOpenPanel openPanel];p.allowedFileTypes=@[@"glb"];p.canChooseDirectories=NO;p.allowsMultipleSelection=NO;
     [p beginSheetModalForWindow:_window completionHandler:^(NSModalResponse result){if(result!=NSModalResponseOK)return;
-        wchar_t path[FS_PATH],error[FS_ERROR]={0};Mesh model={0};if(!wide(p.URL.path,path)||!mesh_read_glb(path,&model,error)){[self alert:@"GLB를 열지 못했습니다" text:stringW(error)];return;}
+        wchar_t path[FS_PATH],error[FS_ERROR]={0};Mesh model={0};if(!pathWide(p.URL.path,path)||!mesh_read_glb(path,&model,error)){[self alert:@"GLB를 열지 못했습니다" text:stringW(error)];return;}
         mesh_free(&self->_mesh);self->_mesh=model;[self displayMesh];self->_save.enabled=YES;self->_status.stringValue=@"모델을 불러왔습니다";
     }];
 }
