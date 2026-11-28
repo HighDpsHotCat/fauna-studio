@@ -44,7 +44,7 @@ class AnimalClassifier:
         names_path = cached_asset(DATA, "embeddings/txt_emb_species.json", progress)
         embeddings_path = cached_asset(DATA, "embeddings/txt_emb_species.npy", progress)
         progress("BioCLIP을 메모리에 불러오는 중")
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = __import__("ai.device", fromlist=["inference_device"]).inference_device()
         if self.device == "cpu":
             torch.set_num_threads(min(torch.get_num_threads(), 8))
         model = open_clip.create_model_from_pretrained(
@@ -59,6 +59,7 @@ class AnimalClassifier:
             raise ValueError("종 목록과 임베딩 크기가 일치하지 않습니다.")
         indices, species_ids, species = [], [], {}
         self.names = []
+        classes, class_ids = {}, []
         for index, (taxonomy, common) in enumerate(labels):
             if taxonomy[0] != "Animalia":
                 continue
@@ -68,13 +69,18 @@ class AnimalClassifier:
             if scientific not in species:
                 species[scientific] = len(self.names)
                 self.names.append((scientific, common))
+                class_name = taxonomy[2]
+                classes.setdefault(class_name, len(classes))
+                class_ids.append(classes[class_name])
             indices.append(index)
             species_ids.append(species[scientific])
         # Copy just the animal columns into a compact matrix, releasing the file mapping.
         self.embeddings = torch.from_numpy(vectors[:, indices].T).to(self.device)
         self.species_ids = torch.tensor(species_ids, dtype=torch.long)
+        self.class_ids = torch.tensor(class_ids, dtype=torch.long)
+        self.class_count = len(classes)
 
-    def predict(self, image):
+    def predict(self, image, limit=3):
         import torch
         from bioclip.predict import preprocess_img
         from torch.nn import functional as F
@@ -86,5 +92,12 @@ class AnimalClassifier:
             probabilities = logits[0].softmax(dim=0).cpu()
             # Some published labels share a binomial. Display each species once.
             grouped = torch.zeros(len(self.names)).scatter_add_(0, self.species_ids, probabilities)
-            scores, ids = grouped.topk(5)
+            # Wildlife datasets also label parasites visible on a host. If the image
+            # strongly supports one animal class, keep the choices in that class.
+            # This prevents a mite label from displacing another mammal in a fox photo.
+            class_scores = torch.zeros(self.class_count).scatter_add_(0, self.class_ids, grouped)
+            dominant = class_scores.argmax()
+            if class_scores[dominant] >= 0.55:
+                grouped = grouped.masked_fill(self.class_ids != dominant, 0)
+            scores, ids = grouped.topk(min(limit, len(self.names)))
         return [Candidate(*self.names[i], score) for i, score in zip(ids.tolist(), scores.tolist())]

@@ -1,7 +1,14 @@
+.DS_Store
 .venv/
+build/
+dist/
 __pycache__/
 *.py[cod]
-dist/
 .env
 .env.*
-!.env.example
+*.log
+*.partial-*/
+outputs/
+models/
+.idea/
+.vscode/

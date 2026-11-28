@@ -1,0 +1,26 @@
+# Neural inference dependencies only. C UI/viewer/postprocessing need none of these.
+torch==2.9.1; platform_machine == "arm64"
+torch==2.2.2; platform_machine == "x86_64"
+torchvision==0.24.1; platform_machine == "arm64"
+torchvision==0.17.2; platform_machine == "x86_64"
+huggingface-hub==0.36.2
+Pillow==11.3.0
+numpy==1.26.4
+omegaconf==2.3.0
+einops==0.8.1
+transformers==4.46.3
+trimesh==4.7.4
+scikit-image==0.25.2
+rembg[cpu]==2.0.67
+opencv-python-headless==4.11.0.86
+imageio>=2.37,<3
+pybioclip==2.1.6
+open-clip-torch==3.3.0
+
+# Universal macOS wheels support both Apple Silicon and Intel.
+onnxruntime==1.19.2
+scipy==1.15.3
+numba==0.61.2
+llvmlite==0.44.0
+pandas==2.2.3
+timm==1.0.22
