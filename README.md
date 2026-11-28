@@ -31,7 +31,7 @@ bash run.command
 ## 사용
 
 1. 사진을 첨부하거나 예제 사진을 선택합니다.
-2. 목표 폴리곤 수와 품질을 정합니다. 얼굴·발·윤곽 보호에 필요한 경우 목표보다 많은 삼각형을 유지합니다.
+2. 목표 폴리곤 수와 품질을 정합니다. 기본 목표는 1,800면입니다. 귀·주둥이·발·윤곽 보호에 필요한 경우 목표보다 많은 삼각형을 유지합니다.
 3. GLB, STL, STEP, 3MF 중 필요한 형식을 체크하고 **3D 생성하기**를 누릅니다.
 4. 이미 만들어진 모델은 **GLB 열기… → 형식 체크 → 선택 형식으로 저장**으로 재생성 없이 변환합니다.
 
@@ -47,6 +47,18 @@ bash run.command
 | 3MF | 인쇄 크기와 색상 포함. 색상 사용 여부는 슬라이서·프린터에 따라 다릅니다 |
 
 STL·STEP·3MF의 긴 변 길이는 mm로 지정합니다. 실제 프린터용 G-code는 별도의 슬라이서에서 만듭니다. STEP 솔리드에 부적합한 메시가 들어오면 오류로 알리며, 조용히 잘못된 솔리드로 저장하지 않습니다.
+
+## 눈 없는 로우폴리 스타일
+
+몸체와 얼굴 모두 평평한 삼각형 면으로 표현합니다. 귀·이마·콧대·코·입·턱의 큰 입체를 유지하며, 눈의 색 무늬는 주변 털색으로 지웁니다. 미세한 눈·입 표현을 위한 면 추가나 사진 색 재투영은 하지 않습니다. 각 삼각형에 하나의 법선과 하나의 색을 저장하므로 GLB를 다른 뷰어에서 열어도 각진 형태가 유지됩니다.
+
+얼굴 위치를 확실히 찾지 못하면 눈 무늬가 남지 않도록 단색 털색을 사용하고 `report.json`의 `uniformCoatFallback`에 기록합니다. 모델 가중치와 TripoSR 추론은 바꾸지 않습니다. 최종 파일은 `model.glb`이고, `original.glb`·`completed.glb`는 스타일 적용 전 중간 결과입니다. 기존 GLB 열기·재저장은 원래 파일의 모습을 그대로 유지합니다.
+
+이미 만든 모델에 새 스타일을 적용하는 개발 명령(결과 폴더의 `input-analysis.json`과 원본 배경 분리 사진 필요):
+
+```bash
+build/aaanimal-cli --form model.glb --context RESULT_DIRECTORY --photo cutout.rgba --target 1800 NEW_OUTPUT.glb
+```
 
 ## 구성과 발표 설명
 
@@ -88,7 +100,7 @@ build/aaanimal-cli --inspect examples/red-fox-lowpoly-3000.glb
 build/aaanimal-cli --export-stl examples/red-fox-lowpoly-3000.glb /tmp/animal.stl --size-mm 100
 build/aaanimal-cli --export-step examples/red-fox-lowpoly-3000.glb /tmp/animal.step
 build/aaanimal-cli --export-3mf examples/red-fox-lowpoly-3000.glb /tmp/animal.3mf
-build/aaanimal-cli --generate --input assets/red-fox.jpg --target 20000 --resolution 320 --formats glb,stl,step,3mf
+build/aaanimal-cli --generate --input assets/red-fox.jpg --target 1800 --resolution 320 --formats glb,stl,step,3mf
 ctest --test-dir build --output-on-failure
 .venv/bin/python tools/check_runtime.py
 ```

@@ -370,3 +370,27 @@ int mesh_lowpoly(const Mesh *source,Mesh *out,uint32_t target,FsCancel * cancel,
     mesh_free(&conditioned);return 1;
 failed:mesh_free(&conditioned);mesh_free(out);return 0;
 }
+/* Broad, planar forms without the legacy eye refinement or 20k face floor. */
+int mesh_form_surface(const Mesh *source,Mesh *out,Job *j){
+    Mesh conditioned={0};memset(out,0,sizeof(*out));j->kept_original=0;
+    if(j->target<300||j->target>200000||!mesh_validate(source,j->error))return 0;
+    if(!mesh_copy(source,&conditioned)){fs_error(j->error,L"로우폴리 메모리가 부족합니다.");return 0;}
+    if(!remove_surface_specks(&conditioned,j->cancel,j->error)||!condition_surface(&conditioned,j->cancel,j->error))goto fail;
+    uint32_t budget=j->target;
+    for(int attempt=0;attempt<8;attempt++){
+        if(fs_cancelled(j)||!mesh_copy(&conditioned,out))goto fail;
+        if(!mesh_simplify(out,budget,j->cancel,j->error))goto fail;
+        j->quality=mesh_compare(&conditioned,out);
+        if(j->quality.silhouette_iou>=.94&&j->quality.depth_rmse<=.035)break;
+        mesh_free(out);
+        if(budget>=conditioned.triangle_count||attempt==7){
+            if(!mesh_copy(&conditioned,out))goto fail;j->kept_original=1;j->quality=mesh_compare(&conditioned,out);break;
+        }
+        budget=(uint32_t)fmin(conditioned.triangle_count,ceil(budget*1.5));
+    }
+    /* Each triangle stores one colour and one geometric normal. No original
+     * photo reprojection may follow this step: it would restore the eyes. */
+    if(fs_cancelled(j)||!mesh_facets(out,j->error))goto fail;
+    mesh_free(&conditioned);return 1;
+fail:mesh_free(&conditioned);mesh_free(out);return 0;
+}

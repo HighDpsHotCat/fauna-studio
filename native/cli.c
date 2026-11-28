@@ -43,7 +43,16 @@ static int run(int argc,wchar_t **argv){
         mesh_free(&a);mesh_free(&b);return 0;
 failed:fwprintf(stderr,L"%ls\n",error);mesh_free(&a);mesh_free(&b);return 1;
     }
-    Job job={0};job.target=20000;job.resolution=320;job.progress=progress;job.formats=EXPORT_GLB;job.cad_size_mm=100;
+    if(argc==10&&!wcscmp(argv[1],L"--form")){
+        Job j={0};Mesh source={0},out={0};Photo photo={0};j.progress=progress;j.target=(uint32_t)fs_wtoi(argv[8]);
+        if(wcscmp(argv[3],L"--context")||wcscmp(argv[5],L"--photo")||wcscmp(argv[7],L"--target"))goto usage;
+        int ok=fs_attributes(argv[9])==INVALID_FILE_ATTRIBUTES&&mesh_read_glb(argv[2],&source,j.error)&&photo_read(argv[6],&photo,j.error)&&mesh_form_model(&j,argv[4],&photo,&source,&out);
+        if(ok){char meta[512];snprintf(meta,sizeof(meta),"{\"style\":\"faceted-form-no-eyes-v1\",\"eyeRegionsSuppressed\":%d,\"uniformCoatFallback\":%s,\"requestedTriangles\":%u,\"resultTriangles\":%u}",j.eye_regions,j.eye_colour_fallback?"true":"false",j.target,out.triangle_count);ok=mesh_write_glb(argv[9],&out,meta,j.error);}
+        if(ok)wprintf(L"triangles=%u -> %u, IoU=%.6f, RMSE=%.6f, eye regions=%d, colour fallback=%d\n",source.triangle_count,out.triangle_count,j.quality.silhouette_iou,j.quality.depth_rmse,j.eye_regions,j.eye_colour_fallback);
+        else fwprintf(stderr,L"%ls\n",j.error[0]?j.error:L"출력 파일이 이미 있거나 입력이 잘못되었습니다.");
+        mesh_free(&source);mesh_free(&out);photo_free(&photo);return ok?0:1;
+    }
+    Job job={0};job.target=1800;job.resolution=320;job.progress=progress;job.formats=EXPORT_GLB;job.cad_size_mm=100;
     if(!fs_root(job.root)){fwprintf(stderr,L"프로젝트 루트를 찾지 못했습니다.\n");return 1;}
     for(int i=1;i<argc;i++){
         if(!wcscmp(argv[i],L"--generate"))continue;
@@ -61,7 +70,8 @@ failed:fwprintf(stderr,L"%ls\n",error);mesh_free(&a);mesh_free(&b);return 1;
     int ok=fs_generate(&job);mesh_free(&job.preview);signal(SIGINT,SIG_DFL);fs_cancel_free(cancel_event);
     if(!ok){fwprintf(stderr,L"%ls\n",job.error);return 1;}wprintf(L"Saved: %ls\n",job.result);return 0;
 usage:
-    wprintf(L"aaanimal-cli --generate --input photo.jpg [--output NEW_DIRECTORY] [--target 20000] [--resolution 320] [--formats glb,stl,step,3mf] [--size-mm 100]\naaanimal-cli --export-stl model.glb NEW_OUTPUT.stl [--size-mm 100]\naaanimal-cli --export-step model.glb NEW_OUTPUT.step [--size-mm 100]\naaanimal-cli --export-3mf model.glb NEW_OUTPUT.3mf [--size-mm 100]\naaanimal-cli --inspect model.glb\naaanimal-cli --surface model.glb --target 20000 NEW_OUTPUT.glb\naaanimal-cli --lowpoly model.glb --target 1200 NEW_OUTPUT.glb\naaanimal-cli --simplify model.glb --target 2400 NEW_OUTPUT.glb\n");return 2;
+    wprintf(L"aaanimal-cli --form model.glb --context RESULT_DIRECTORY --photo cutout.rgba --target 1800 NEW_OUTPUT.glb\n");
+    wprintf(L"aaanimal-cli --generate --input photo.jpg [--output NEW_DIRECTORY] [--target 1800] [--resolution 320] [--formats glb,stl,step,3mf] [--size-mm 100]\naaanimal-cli --export-stl model.glb NEW_OUTPUT.stl [--size-mm 100]\naaanimal-cli --export-step model.glb NEW_OUTPUT.step [--size-mm 100]\naaanimal-cli --export-3mf model.glb NEW_OUTPUT.3mf [--size-mm 100]\naaanimal-cli --inspect model.glb\naaanimal-cli --surface model.glb --target 20000 NEW_OUTPUT.glb\naaanimal-cli --lowpoly model.glb --target 1200 NEW_OUTPUT.glb\naaanimal-cli --simplify model.glb --target 2400 NEW_OUTPUT.glb\n");return 2;
 }
 
 int main(int argc,char **argv){fs_init();wchar_t **wide=calloc((size_t)argc,sizeof(*wide));if(!wide)return 1;int ok=1;for(int i=0;i<argc;i++){wide[i]=calloc(strlen(argv[i])+1,sizeof(wchar_t));if(!wide[i]||!fs_decode_utf8(0,0,argv[i],-1,wide[i],(int)strlen(argv[i])+1)){ok=0;break;}}int result=ok?run(argc,wide):1;for(int i=0;i<argc;i++)free(wide[i]);free(wide);return result;}

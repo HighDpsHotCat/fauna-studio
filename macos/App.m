@@ -39,7 +39,7 @@ static void progress(void *context,const wchar_t *message){
     _filename=label(@"사진을 선택하세요",NO);_filename.lineBreakMode=NSLineBreakByTruncatingMiddle;
     _browse=[self button:@"사진 첨부…" action:@selector(browse:)];_example=[self button:@"예제 사진" action:@selector(example:)];
     NSButton *qualityHelp=[self button:@"?" action:@selector(qualityHelp:)];qualityHelp.bezelStyle=NSBezelStyleHelpButton;qualityHelp.toolTip=@"목표 폴리곤 수와 품질 안내";
-    _target=[NSTextField textFieldWithString:@"20000"];[_target.widthAnchor constraintEqualToConstant:100].active=YES;
+    _target=[NSTextField textFieldWithString:@"1800"];[_target.widthAnchor constraintEqualToConstant:100].active=YES;
     _quality=[NSPopUpButton new];[_quality addItemsWithTitles:@[@"빠르게 · 192",@"고품질 · 256",@"세밀하게 · 320"]];[_quality selectItemAtIndex:2];
     _references=[NSButton checkboxWithTitle:@"유사 자세 참고로 형태 보완" target:nil action:nil];_references.state=NSControlStateValueOn;
     NSButton *formatHelp=[self button:@"?" action:@selector(formatHelp:)];formatHelp.bezelStyle=NSBezelStyleHelpButton;formatHelp.toolTip=@"저장 형식 안내";
@@ -91,7 +91,7 @@ static void progress(void *context,const wchar_t *message){
     if(!png||![png writeToFile:[NSString stringWithUTF8String:output] atomically:YES]){fprintf(stderr,"UI smoke: capture failed\n");exit(1);}
     puts("PASS Cocoa window, controls, SceneKit scene and example model");[NSApp terminate:nil];
 }
-- (void)qualityHelp:(id)sender {(void)sender;[self alert:@"목표 폴리곤 수 / 품질" text:@"목표는 삼각형 개수입니다. 윤곽·얼굴·발을 보호해야 할 때는 면 수를 늘립니다.\n품질 수치가 높으면 TripoSR에서 더 세밀한 표면을 추출하지만 시간과 메모리가 더 필요합니다."];}
+- (void)qualityHelp:(id)sender {(void)sender;[self alert:@"목표 폴리곤 수 / 품질" text:@"몸체와 얼굴을 각진 로우폴리 면으로 표현합니다. 귀·이마·콧대·코·입·턱의 큰 형태를 남기며 눈 무늬는 지웁니다.\n권장 시작값은 1,800면입니다. 귀·주둥이·발 윤곽을 보호하면 면 수가 늘어날 수 있습니다. 얼굴 위치가 불확실하면 단색 털색을 사용합니다.\n품질 수치가 높으면 TripoSR에서 더 세밀한 표면을 추출하지만 시간과 메모리가 더 필요합니다."];}
 - (void)formatHelp:(id)sender {(void)sender;[self alert:@"저장 형식" text:@"여러 개를 선택할 수 있습니다. 생성된 모델은 다시 생성하지 않고 다른 형식으로 저장할 수 있습니다.\nGLB: 색상이 있는 3D 모델\nSTL: 색상 없는 삼각형 메시\nSTEP: 색상 없는 삼각면 기반 CAD 형상\n3MF: 크기·색상을 포함하는 3D 인쇄 파일\n3MF 색상 지원은 슬라이서·프린터에 따라 다릅니다. G-code는 슬라이서에서 만드세요."];}
 - (void)setInput:(NSURL*)url {_input=url.path;_photo.image=[[NSImage alloc] initWithContentsOfURL:url];_filename.stringValue=url.lastPathComponent;}
 - (void)browse:(id)sender {(void)sender;NSOpenPanel *p=[NSOpenPanel openPanel];p.allowedFileTypes=@[@"jpg",@"jpeg",@"png",@"webp",@"heic",@"tiff"];p.allowsMultipleSelection=NO;p.canChooseDirectories=NO;[p beginSheetModalForWindow:_window completionHandler:^(NSModalResponse result){if(result==NSModalResponseOK)[self setInput:p.URL];}];}

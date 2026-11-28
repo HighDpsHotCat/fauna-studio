@@ -7,7 +7,7 @@ find_package(Threads REQUIRED)
 add_library(aaanimal_core STATIC
   native/platform.c native/image.c native/mesh.c native/simplify.c
   native/style.c native/body.c native/shape.c native/detail.c native/observed.c
-  native/volume.c native/export.c native/pipeline.c native/references.c native/gbif.c
+  native/volume.c native/form.c native/export.c native/pipeline.c native/references.c native/gbif.c
   vendor/cjson/cJSON.c)
 target_include_directories(aaanimal_core PUBLIC native)
 target_compile_options(aaanimal_core PRIVATE -Wall -Wextra -Wno-misleading-indentation -Wno-deprecated-declarations)

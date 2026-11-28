@@ -254,6 +254,32 @@ static void volume_fallback(const Mesh *source){
     for(uint32_t i=0;i<out.vertex_count;i++)assert(!memcmp(out.vertices[i].p,source->vertices[i].p,12));mesh_free(&out);
     job.cancel=fs_cancel_create(NULL,1,1,NULL);assert(!mesh_volume(&job,&photo,source,&guide,&out));fs_cancel_free(job.cancel);puts("PASS unavailable anatomical evidence preserves source geometry; cancellation honored");
 }
+
+static void form_style(const Mesh *mesh){
+    Job j={0};j.target=1200;Mesh input={0},prepared={0},out={0};Photo photo={0};assert(mesh_copy(mesh,&input));
+    photo.width=photo.height=100;photo.rgba=malloc(40000);assert(photo.rgba);
+    for(int y=0;y<100;y++)for(int x=0;x<100;x++){unsigned char *c=photo.rgba+4*(y*100+x);c[0]=170;c[1]=120;c[2]=70;c[3]=255;if((abs(x-35)<5||abs(x-65)<5)&&abs(y-40)<4)c[0]=c[1]=c[2]=5;}
+    for(uint32_t i=0;i<input.vertex_count;i++){Vertex *v=&input.vertices[i];v->face=v->smooth=1;v->observed=1;v->detail=8;v->source_uv[0]=.1f;v->source_uv[1]=.9f;}
+    input.vertices[0].source_uv[0]=35.f/99;input.vertices[0].source_uv[1]=40.f/99;memset(input.vertices[0].color,5,3);
+    input.vertices[1].source_uv[0]=65.f/99;input.vertices[1].source_uv[1]=40.f/99;memset(input.vertices[1].color,5,3);
+    wchar_t directory[FS_PATH],path[FS_PATH];FsId id;assert(FS_SUCCEEDED(fs_create_id(&id)));fs_wformat(directory,FS_PATH,L"test-form-%08lx",id.value);assert(fs_mkdir(directory,NULL));fs_join(path,directory,L"input-analysis.json");
+    FILE *f=fs_wfopen(path,L"wb");assert(f);fputs("{\"animalPose\":{\"points\":[{\"x\":0.35,\"y\":0.4,\"score\":1},{\"x\":0.65,\"y\":0.4,\"score\":1},{\"x\":0.5,\"y\":0.6,\"score\":1}]}}",f);fclose(f);
+    assert(mesh_form_prepare(&j,directory,&photo,&input,&prepared));assert(j.eye_regions==2&&!j.eye_colour_fallback&&j.eye_colour_vertices>=2);
+    for(int i=0;i<2;i++){assert(prepared.vertices[i].color[0]==170&&prepared.vertices[i].color[1]==120&&prepared.vertices[i].color[2]==70);assert(!memcmp(input.vertices[i].p,prepared.vertices[i].p,12));}
+    assert(input.vertices[0].color[0]==5);assert(!memcmp(input.vertices[2].color,prepared.vertices[2].color,4));
+    for(uint32_t i=0;i<prepared.vertex_count;i++)assert(!prepared.vertices[i].observed&&!prepared.vertices[i].face&&!prepared.vertices[i].smooth&&!prepared.vertices[i].detail);
+    assert(mesh_form_surface(&prepared,&out,&j));assert(out.triangle_count>=j.target&&out.triangle_count<4096);assert(out.vertex_count==3*out.triangle_count);
+    for(uint32_t i=0;i<out.triangle_count;i++){const Vertex *a=&out.vertices[out.triangles[i].v[0]];for(int k=1;k<3;k++){const Vertex *b=&out.vertices[out.triangles[i].v[k]];assert(!memcmp(a->color,b->color,4));assert(!memcmp(a->n,b->n,12));}}
+    assert(mesh_write_step(L"test-form.step",&out,100,NULL,j.error));assert(fs_unlink(L"test-form.step"));
+    assert(mesh_write_glb(L"test-form.glb",&out,"{}",j.error));Mesh read={0};assert(mesh_read_glb(L"test-form.glb",&read,j.error));
+    for(uint32_t i=0;i<out.vertex_count;i++)assert(!memcmp(out.vertices[i].color,read.vertices[i].color,4));mesh_free(&read);assert(fs_unlink(L"test-form.glb"));
+    mesh_free(&out);mesh_free(&prepared);assert(mesh_form_prepare(&j,NULL,NULL,&input,&prepared));assert(j.eye_colour_fallback);
+    for(uint32_t i=1;i<prepared.vertex_count;i++)assert(!memcmp(prepared.vertices[0].color,prepared.vertices[i].color,3));mesh_free(&prepared);
+    j.cancel=fs_cancel_create(NULL,1,1,NULL);assert(!mesh_form_model(&j,directory,&photo,&input,&out));fs_cancel_free(j.cancel);
+    assert(fs_unlink(path));assert(fs_rmdir(directory));photo_free(&photo);mesh_free(&input);
+    puts("PASS eye paint removal, unchanged source/coat outside mask, explicit no-landmark fallback, low face budget, flat stored normals/colours, STEP and cancellation");
+}
+
 int main(void){fs_init();
     gbif_media_filter();
     observed_surface();
@@ -297,6 +323,7 @@ int main(void){fs_init();
     }
     mesh_free(&faceted);mesh_free(&faceted_read);fs_unlink(L"test-faceted.glb");
     puts("PASS flat face normals and constant face colors are exported and reopened without geometry changes");
+    form_style(&a);
     Mesh adaptive={0};Quality preservation={0};int kept=0;
     assert(mesh_lowpoly(&a,&adaptive,300,NULL,&preservation,&kept,error));
     assert(preservation.silhouette_iou>=.94&&preservation.depth_rmse<=.035);

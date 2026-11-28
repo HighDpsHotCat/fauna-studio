@@ -41,17 +41,16 @@ int fs_generate(Job *job){
     for(size_t i=0;i<(size_t)cutout.width*cutout.height;i++){const unsigned char *s=cutout.rgba+4*i;unsigned char *d=depth_photo.rgba+4*i;for(int k=0;k<3;k++)d[k]=(unsigned char)((s[k]*s[3]+128*(255-s[3])+127)/255);d[3]=255;}
     if(!photo_write(depth_input,&depth_photo,job->error))goto done;
     if(fs_python(job,L"depth",depth_input,depth_path,log)){
-        fs_status(job,L"C에서 원본의 눈·코·입과 발 윤곽에 맞춰 표면을 보완하는 중");
+        fs_status(job,L"C에서 원본의 머리·주둥이와 발 윤곽을 보완하는 중");
         if(!mesh_observed(job,&cutout,depth_path,&colored,&observed))goto done;
         mesh_free(&colored);colored=observed;memset(&observed,0,sizeof(observed));
     }else{if(fs_cancelled(job))goto done;job->error[0]=0;fs_status(job,L"깊이 보완을 사용할 수 없어 TripoSR 원형을 유지합니다.");}
     if(!references_volume(job,directory,&cutout,&colored,&observed))goto done;
     mesh_free(&colored);colored=observed;memset(&observed,0,sizeof(observed));
-    fs_status(job,L"C에서 눈·코·입과 발을 보호하며 부드러운 표면을 만드는 중");
-    if(!mesh_surface(&colored,&reduced,job->target,job->cancel,&job->quality,&job->kept_original,job->error)||fs_cancelled(job))goto done;
-    if(job->observed_surface&&!mesh_observed_colour(job,&cutout,&reduced))goto done;
+    fs_status(job,L"C에서 눈 무늬를 지우고 각진 로우폴리 면을 만드는 중");
+    if(!mesh_form_model(job,directory,&cutout,&colored,&reduced)||fs_cancelled(job))goto done;
     const Mesh *result=&reduced;job->final_triangles=result->triangle_count;
-    if(result->triangle_count>job->target)fs_status(job,L"눈·코·입과 발 표현에 필요한 면을 유지합니다.");
+    if(result->triangle_count>job->target)fs_status(job,L"귀·주둥이·턱과 발 윤곽에 필요한 면을 유지합니다.");
     char digest[65];if(!sha256(job->input,digest)){fs_error(job->error,L"원본 사진 해시를 계산할 수 없습니다.");goto done;}
     report=cJSON_CreateObject();
     cJSON_AddStringToObject(report,"application","AAAnimal Studio");cJSON_AddStringToObject(report,"model","stabilityai/TripoSR");
@@ -83,9 +82,13 @@ int fs_generate(Job *job){
     cJSON_AddNumberToObject(report,"shapeFrontSilhouetteIoU",job->shape_iou);
     cJSON_AddNumberToObject(report,"shapeDepthRatio",job->shape_depth_ratio);
     cJSON_AddStringToObject(report,"referenceUse","C-selected palette, up to 15 percent blend on unseen rear only; original front colours preserved; see references.json");
-    cJSON_AddStringToObject(report,"style",job->volume_head?"reference-volume-v5":(job->observed_surface?"photo-depth-surface-v4":"observed-smooth-surface-v3"));
-    cJSON_AddStringToObject(report,"normals","smooth interpolated normals across face and body, stored in GLB");
-    cJSON_AddStringToObject(report,"colors",job->observed_surface?"input photo resampled on observed front; TripoSR colours on rear; no palette quantization":"continuous TripoSR vertex colours");
+    cJSON_AddStringToObject(report,"style","faceted-form-no-eyes-v1");
+    cJSON_AddNumberToObject(report,"eyeRegionsSuppressed",job->eye_regions);
+    cJSON_AddNumberToObject(report,"eyeColourVerticesChanged",job->eye_colour_vertices);
+    cJSON_AddBoolToObject(report,"uniformCoatFallback",job->eye_colour_fallback);
+    cJSON_AddStringToObject(report,"faceStyle","ears, forehead, muzzle, nose, mouth and jaw volumes; no painted eyes or fine facial refinement");
+    cJSON_AddStringToObject(report,"normals","one geometric normal per triangle across face and body; stored in GLB");
+    cJSON_AddStringToObject(report,"colors","24-colour coat palette; one colour per triangle; eye regions replaced with surrounding coat before simplification; uniform coat if landmarks unavailable");
     cJSON_AddNumberToObject(report,"faceDetailVertices",job->face_detail_vertices);
     cJSON_AddBoolToObject(report,"finalViewFaceProjection",job->face_projection);
     cJSON_AddNumberToObject(report,"faceSurfaceMaxDisplacement",job->face_surface_displacement);
@@ -100,7 +103,7 @@ int fs_generate(Job *job){
     cJSON_AddNumberToObject(report,"eyeNoseMouthTriangles",0);
     cJSON_AddNumberToObject(report,"detailProtectedTriangles",protected_triangles);
     cJSON_AddBoolToObject(report,"sourceFrontGeometryPreserved",!job->observed_surface&&!job->volume_head);
-    cJSON_AddStringToObject(report,"detailMethod","closed front/rear surface fusion; photo-space edge limits preserve small eyes and mouth; source-photo colour resampling after C QEM; six-view simplification checks");
+    cJSON_AddStringToObject(report,"detailMethod","closed front/rear surface fusion; geometry-focused C QEM; no iris subdivisions or final photo projection; six-view outline/depth checks");
     cJSON_AddBoolToObject(report,"budgetAdjusted",result->triangle_count>job->target);
     char species[512];fs_encode_utf8(CP_UTF8,0,job->species,-1,species,sizeof(species),NULL,NULL);
     cJSON_AddStringToObject(report,"species",species);cJSON_AddNumberToObject(report,"referenceCount",job->reference_count);
@@ -124,7 +127,7 @@ int fs_generate(Job *job){
     metadata=cJSON_PrintUnformatted(report);if(!metadata){fs_error(job->error,L"메타데이터 메모리가 부족합니다.");goto done;}
     fs_status(job,L"선택한 형식으로 최종 모델을 저장하는 중");
     if(job->formats&EXPORT_GLB){fs_join(path,directory,L"original.glb");if(!mesh_write_glb(path,&original,"{\"model\":\"TripoSR\",\"unmodifiedInference\":true}",job->error))goto done;}
-    if(job->formats&EXPORT_GLB){fs_join(path,directory,L"completed.glb");if(!mesh_write_glb(path,&colored,metadata,job->error))goto done;}
+    if(job->formats&EXPORT_GLB){fs_join(path,directory,L"completed.glb");if(!mesh_write_glb(path,&colored,"{\"stage\":\"before_faceted_style\",\"finalOutput\":\"model.glb\"}",job->error))goto done;}
     if(!mesh_export(directory,result,job->formats,job->cad_size_mm,metadata,job->cancel,job->error))goto done;
     fs_join(path,directory,L"report.json");FILE *f=fs_wfopen(path,L"wb");if(!f)goto done;
     size_t length=strlen(metadata);int written=fwrite(metadata,1,length,f)==length;if(fclose(f))written=0;if(!written)goto done;

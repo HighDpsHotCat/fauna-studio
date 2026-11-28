@@ -46,6 +46,7 @@ typedef struct {
     Quality quality;
     uint32_t original_triangles, final_triangles;
     int kept_original;
+    int eye_regions,eye_colour_vertices,eye_colour_fallback;
     int reference_count;
     int shape_disabled, shape_used;
     double shape_iou, shape_depth_ratio;
@@ -111,6 +112,9 @@ int mesh_export(const wchar_t *directory, const Mesh *mesh, unsigned formats, do
                 const char *extras, FsCancel * cancel, wchar_t *error);
 int mesh_simplify(Mesh *mesh, uint32_t target, FsCancel * cancel, wchar_t *error);
 int mesh_facets(Mesh *mesh, wchar_t *error);
+int mesh_form_prepare(Job *job, const wchar_t *directory, const Photo *photo, const Mesh *source, Mesh *out);
+int mesh_form_model(Job *job, const wchar_t *directory, const Photo *photo, const Mesh *source, Mesh *out);
+int mesh_form_surface(const Mesh *source, Mesh *out, Job *job);
 int mesh_lowpoly(const Mesh *source, Mesh *out, uint32_t target, FsCancel * cancel,
                  Quality *quality, int *kept_original, wchar_t *error);
 int mesh_surface(const Mesh *source, Mesh *out, uint32_t target, FsCancel * cancel,
