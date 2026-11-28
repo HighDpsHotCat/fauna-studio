@@ -84,7 +84,7 @@ static void progress(void *context,const wchar_t *message){
     [_window.contentView cacheDisplayInRect:_window.contentView.bounds toBitmapImageRep:bitmap];
     /* cacheDisplay omits Metal layers and the NSWindow background. */
     NSImage *capture=[[NSImage alloc] initWithSize:_window.contentView.bounds.size];[capture lockFocus];
-    [NSColor.windowBackgroundColor setFill];NSRectFill(_window.contentView.bounds);[bitmap drawInRect:_window.contentView.bounds];
+    [NSColor.windowBackgroundColor setFill];NSRectFill(_window.contentView.bounds);[bitmap drawInRect:_window.contentView.bounds fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1 respectFlipped:NO hints:nil];
     NSRect sceneRect=[_viewer convertRect:_viewer.bounds toView:_window.contentView];
     [[_viewer snapshot] drawInRect:sceneRect fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1];[capture unlockFocus];
     NSData *png=[[NSBitmapImageRep imageRepWithData:capture.TIFFRepresentation] representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
@@ -139,7 +139,7 @@ static void progress(void *context,const wchar_t *message){
     SCNScene *scene=[SCNScene scene];float lo[3]={-.5f,-.5f,-.5f},hi[3]={.5f,.5f,.5f};
     if(_mesh.triangle_count){
         mesh_bounds(&_mesh,lo,hi);NSMutableData *vertices=[NSMutableData dataWithLength:(NSUInteger)_mesh.vertex_count*10*sizeof(float)];float *d=vertices.mutableBytes;
-        for(uint32_t i=0;i<_mesh.vertex_count;i++){Vertex *v=&_mesh.vertices[i];memcpy(d+10*i,v->p,12);memcpy(d+10*i+3,v->n,12);for(int c=0;c<4;c++)d[10*i+6+c]=v->color[c]/255.0f;}
+        for(uint32_t i=0;i<_mesh.vertex_count;i++){Vertex *v=&_mesh.vertices[i];memcpy(d+10*i,v->p,12);memcpy(d+10*i+3,v->n,12);for(int c=0;c<4;c++){float value=v->color[c]/255.0f;d[10*i+6+c]=c==3?value:(value<=.04045f?value/12.92f:powf((value+.055f)/1.055f,2.4f));}}
         NSMutableArray *sources=[NSMutableArray array];NSArray *semantics=@[SCNGeometrySourceSemanticVertex,SCNGeometrySourceSemanticNormal,SCNGeometrySourceSemanticColor];
         for(int i=0;i<3;i++)[sources addObject:[SCNGeometrySource geometrySourceWithData:vertices semantic:semantics[i] vectorCount:_mesh.vertex_count floatComponents:YES componentsPerVector:i==2?4:3 bytesPerComponent:sizeof(float) dataOffset:(NSUInteger)i*3*sizeof(float) dataStride:10*sizeof(float)]];
         NSData *indices=[NSData dataWithBytes:_mesh.triangles length:(NSUInteger)_mesh.triangle_count*sizeof(Triangle)];SCNGeometryElement *element=[SCNGeometryElement geometryElementWithData:indices primitiveType:SCNGeometryPrimitiveTypeTriangles primitiveCount:_mesh.triangle_count bytesPerIndex:sizeof(uint32_t)];
@@ -147,13 +147,16 @@ static void progress(void *context,const wchar_t *message){
     }
     float span=fmaxf(hi[0]-lo[0],fmaxf(hi[1]-lo[1],hi[2]-lo[2]));if(span<.001f)span=1;
     float cx=(lo[0]+hi[0])*.5f,cy=(lo[1]+hi[1])*.5f,cz=(lo[2]+hi[2])*.5f;
-    SCNVector3 grid[84];int count=0;float extent=span*1.25f,y=lo[1]-span*.003f;
-    for(int i=-10;i<=10;i++){float t=extent*i/10;grid[count++]=SCNVector3Make(cx+t,y,cz-extent);grid[count++]=SCNVector3Make(cx+t,y,cz+extent);grid[count++]=SCNVector3Make(cx-extent,y,cz+t);grid[count++]=SCNVector3Make(cx+extent,y,cz+t);}
-    SCNGeometrySource *source=[SCNGeometrySource geometrySourceWithVertices:grid count:count];uint32_t idx[84];for(int i=0;i<count;i++)idx[i]=(uint32_t)i;
-    SCNGeometryElement *lines=[SCNGeometryElement geometryElementWithData:[NSData dataWithBytes:idx length:sizeof(idx)] primitiveType:SCNGeometryPrimitiveTypeLine primitiveCount:count/2 bytesPerIndex:4];
-    SCNGeometry *ground=[SCNGeometry geometryWithSources:@[source] elements:@[lines]];SCNMaterial *line=[SCNMaterial material];line.lightingModelName=SCNLightingModelConstant;line.diffuse.contents=[NSColor colorWithWhite:.57 alpha:.55];ground.materials=@[line];[scene.rootNode addChildNode:[SCNNode nodeWithGeometry:ground]];
-    SCNNode *ambient=[SCNNode node];ambient.light=[SCNLight light];ambient.light.type=SCNLightTypeAmbient;ambient.light.intensity=650;[scene.rootNode addChildNode:ambient];
-    SCNNode *light=[SCNNode node];light.light=[SCNLight light];light.light.type=SCNLightTypeOmni;light.light.intensity=700;light.position=SCNVector3Make(cx-span*2,cy+span*3,cz-span*4);[scene.rootNode addChildNode:light];
+    float extent=span*1.25f,y=lo[1]-span*.003f;
+    SCNMaterial *line=[SCNMaterial material];line.lightingModelName=SCNLightingModelConstant;
+    line.diffuse.contents=[NSColor colorWithSRGBRed:.55 green:.57 blue:.59 alpha:1];
+    for(int i=-10;i<=10;i++)for(int axis=0;axis<2;axis++){
+        float t=extent*i/10,thickness=span*.001f;
+        SCNBox *box=[SCNBox boxWithWidth:axis?extent*2:thickness height:thickness*.25f length:axis?thickness:extent*2 chamferRadius:0];box.materials=@[line];
+        SCNNode *node=[SCNNode nodeWithGeometry:box];node.position=SCNVector3Make(cx+(axis?0:t),y,cz+(axis?t:0));[scene.rootNode addChildNode:node];
+    }
+    SCNNode *ambient=[SCNNode node];ambient.light=[SCNLight light];ambient.light.type=SCNLightTypeAmbient;ambient.light.intensity=250;[scene.rootNode addChildNode:ambient];
+    SCNNode *light=[SCNNode node];light.light=[SCNLight light];light.light.type=SCNLightTypeOmni;light.light.intensity=600;light.position=SCNVector3Make(cx-span*2,cy+span*3,cz-span*4);[scene.rootNode addChildNode:light];
     SCNNode *camera=[SCNNode node];camera.camera=[SCNCamera camera];camera.camera.fieldOfView=38;camera.camera.zNear=span*.005;camera.camera.zFar=span*100;
     camera.position=SCNVector3Make(cx+span*.35f,cy+span*.22f,cz-span*2.35f);[camera lookAt:SCNVector3Make(cx,cy,cz)];[scene.rootNode addChildNode:camera];
     _viewer.scene=scene;_viewer.pointOfView=camera;_viewer.defaultCameraController.target=SCNVector3Make(cx,cy,cz);_viewer.defaultCameraController.inertiaEnabled=YES;
