@@ -31,7 +31,7 @@ bash run.command
 ## 사용
 
 1. 사진을 첨부하거나 예제 사진을 선택합니다.
-2. 목표 폴리곤 수와 품질을 정합니다. 기본 목표는 1,800면입니다. 귀·주둥이·발·윤곽 보호에 필요한 경우 목표보다 많은 삼각형을 유지합니다.
+2. 목표 폴리곤 수와 품질을 정합니다. 기본 목표는 900면입니다. 귀·주둥이·발·윤곽 보호에 필요한 경우 목표보다 많은 삼각형을 유지합니다.
 3. GLB, STL, STEP, 3MF 중 필요한 형식을 체크하고 **3D 생성하기**를 누릅니다.
 4. 이미 만들어진 모델은 **GLB 열기… → 형식 체크 → 선택 형식으로 저장**으로 재생성 없이 변환합니다.
 
@@ -57,7 +57,7 @@ STL·STEP·3MF의 긴 변 길이는 mm로 지정합니다. 실제 프린터용 G
 이미 만든 모델에 새 스타일을 적용하는 개발 명령(결과 폴더의 `input-analysis.json`과 원본 배경 분리 사진 필요):
 
 ```bash
-build/aaanimal-cli --form model.glb --context RESULT_DIRECTORY --photo cutout.rgba --target 1800 NEW_OUTPUT.glb
+build/aaanimal-cli --form model.glb --context RESULT_DIRECTORY --photo cutout.rgba --target 900 NEW_OUTPUT.glb
 ```
 
 ## 구성과 발표 설명
@@ -100,7 +100,7 @@ build/aaanimal-cli --inspect examples/red-fox-lowpoly-3000.glb
 build/aaanimal-cli --export-stl examples/red-fox-lowpoly-3000.glb /tmp/animal.stl --size-mm 100
 build/aaanimal-cli --export-step examples/red-fox-lowpoly-3000.glb /tmp/animal.step
 build/aaanimal-cli --export-3mf examples/red-fox-lowpoly-3000.glb /tmp/animal.3mf
-build/aaanimal-cli --generate --input assets/red-fox.jpg --target 1800 --resolution 320 --formats glb,stl,step,3mf
+build/aaanimal-cli --generate --input assets/red-fox.jpg --target 900 --resolution 320 --formats glb,stl,step,3mf
 ctest --test-dir build --output-on-failure
 .venv/bin/python tools/check_runtime.py
 ```
@@ -115,3 +115,7 @@ CLI의 출력 파일·지정 출력 폴더는 아직 존재하지 않는 이름�
 - `examples/red-fox-lowpoly-3000.glb`: 위 예제를 바탕으로 생성·가공한 미리보기 예제. 같은 CC BY-SA 4.0 조건으로 제공합니다.
 
 개인 입력 사진, 생성 작업 기록, 가중치, 가상환경, 플랫폼별 빌드 결과는 버전 관리에 포함하지 않습니다.
+
+## 더 큰 면의 로우폴리
+
+현재 `faceted-form-no-eyes-v2`의 기본 목표는 900면입니다. 600~1,200면에서 큰 평면이 강조됩니다. 여섯 방향의 윤곽 IoU 0.94를 유지하면서 깊이 RMSE 한도를 0.05로 조정해 곡면을 촘촘하게 복원하던 면 증가를 줄였습니다. 눈 없는 표현과 면별 평면 법선은 유지하며, GLB뿐 아니라 STL·STEP·3MF에도 실제로 줄인 형상을 저장합니다. 사진 추론을 다시 실행하지 않고 코기 기존 형상을 처리한 결과는 v1 2,700면 → v2 1,350면입니다(요청 900, 최소 윤곽 IoU 0.966887 / 최대 깊이 RMSE 0.045720). 이 지표는 원래 메시 대비 보존도입니다.

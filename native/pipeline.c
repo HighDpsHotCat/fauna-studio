@@ -82,7 +82,7 @@ int fs_generate(Job *job){
     cJSON_AddNumberToObject(report,"shapeFrontSilhouetteIoU",job->shape_iou);
     cJSON_AddNumberToObject(report,"shapeDepthRatio",job->shape_depth_ratio);
     cJSON_AddStringToObject(report,"referenceUse","C-selected palette, up to 15 percent blend on unseen rear only; original front colours preserved; see references.json");
-    cJSON_AddStringToObject(report,"style","faceted-form-no-eyes-v1");
+    cJSON_AddStringToObject(report,"style","faceted-form-no-eyes-v2");
     cJSON_AddNumberToObject(report,"eyeRegionsSuppressed",job->eye_regions);
     cJSON_AddNumberToObject(report,"eyeColourVerticesChanged",job->eye_colour_vertices);
     cJSON_AddBoolToObject(report,"uniformCoatFallback",job->eye_colour_fallback);

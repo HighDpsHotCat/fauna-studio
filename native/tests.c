@@ -275,7 +275,7 @@ static void volume_fallback(const Mesh *source){
 }
 
 static void form_style(const Mesh *mesh){
-    Job j={0};j.target=1200;Mesh input={0},prepared={0},out={0};Photo photo={0};assert(mesh_copy(mesh,&input));
+    Job j={0};j.target=900;Mesh input={0},prepared={0},out={0};Photo photo={0};assert(mesh_copy(mesh,&input));
     photo.width=photo.height=100;photo.rgba=malloc(40000);assert(photo.rgba);
     for(int y=0;y<100;y++)for(int x=0;x<100;x++){unsigned char *c=photo.rgba+4*(y*100+x);c[0]=170;c[1]=120;c[2]=70;c[3]=255;if((abs(x-35)<5||abs(x-65)<5)&&abs(y-40)<4)c[0]=c[1]=c[2]=5;}
     for(uint32_t i=0;i<input.vertex_count;i++){Vertex *v=&input.vertices[i];v->face=v->smooth=1;v->observed=1;v->detail=8;v->source_uv[0]=.1f;v->source_uv[1]=.9f;}
