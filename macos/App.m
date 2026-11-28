@@ -39,7 +39,7 @@ static void progress(void *context,const wchar_t *message){
     _filename=label(@"사진을 선택하세요",NO);_filename.lineBreakMode=NSLineBreakByTruncatingMiddle;
     _browse=[self button:@"사진 첨부…" action:@selector(browse:)];_example=[self button:@"예제 사진" action:@selector(example:)];
     NSButton *qualityHelp=[self button:@"?" action:@selector(qualityHelp:)];qualityHelp.bezelStyle=NSBezelStyleHelpButton;qualityHelp.toolTip=@"자동 로우폴리와 품질 안내";
-    _style=label(@"각진 로우폴리 · 자동",NO);
+    _style=label(@"로우폴리 · 자동",NO);
     _quality=[NSPopUpButton new];[_quality addItemsWithTitles:@[@"빠르게 · 192",@"고품질 · 256",@"세밀하게 · 320"]];[_quality selectItemAtIndex:2];
     _references=[NSButton checkboxWithTitle:@"유사 자세 참고로 형태 보완" target:nil action:nil];_references.state=NSControlStateValueOn;
     NSButton *formatHelp=[self button:@"?" action:@selector(formatHelp:)];formatHelp.bezelStyle=NSBezelStyleHelpButton;formatHelp.toolTip=@"저장 형식 안내";
