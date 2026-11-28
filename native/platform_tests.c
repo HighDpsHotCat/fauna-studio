@@ -1,6 +1,25 @@
 #include "fauna.h"
 #include <assert.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <pthread.h>
+static void *cancel_soon(void *p){struct timespec t={0,150000000};nanosleep(&t,NULL);fs_cancel_set(p);return NULL;}
+static void subprocess_test(void){
+    Job j={0};wchar_t relative[128],venv[FS_PATH],bin[FS_PATH],py[FS_PATH],script_dir[FS_PATH],log[FS_PATH];
+    fs_wformat(relative,128,L"test-process-%u",(unsigned)getpid());assert(fs_absolute(relative,FS_PATH,j.root,NULL));assert(fs_mkdir(j.root,NULL));
+    fs_join(venv,j.root,L".venv");fs_join(bin,venv,L"bin");fs_join(py,bin,L"python");fs_join(script_dir,j.root,L"ai");fs_join(log,j.root,L"inference.log");
+    assert(!fs_mkdirs(NULL,bin,NULL));assert(fs_mkdir(script_dir,NULL));
+    FILE *f=fs_wfopen(py,L"wb");assert(f);fputs("#!/bin/sh\nprintf '%s\\n' \"$7\" \"$9\"\n",f);fclose(f);
+    char path[16384];assert(fs_encode_utf8(0,0,py,-1,path,sizeof(path),NULL,NULL));assert(!chmod(path,0700));
+    j.resolution=256;assert(fs_python(&j,L"infer",L"한글 경로 사진",L"결과 폴더",log));
+    f=fs_wfopen(log,L"rb");assert(f);char bytes[128]={0};assert(fread(bytes,1,sizeof(bytes)-1,f)>0);fclose(f);assert(!strcmp(bytes,"한글 경로 사진\n결과 폴더\n"));
+    f=fs_wfopen(py,L"wb");assert(f);fputs("#!/bin/sh\nexit 7\n",f);fclose(f);assert(!fs_python(&j,L"infer",L"in",L"out",log));assert(j.error[0]);
+    f=fs_wfopen(py,L"wb");assert(f);fputs("#!/bin/sh\nsleep 30\n",f);fclose(f);
+    j.error[0]=0;j.cancel=fs_cancel_create(NULL,1,0,NULL);pthread_t thread;assert(!pthread_create(&thread,NULL,cancel_soon,j.cancel));
+    uint64_t start=fs_milliseconds();assert(!fs_python(&j,L"infer",L"in",L"out",log));assert(fs_milliseconds()-start<5000);pthread_join(thread,NULL);fs_cancel_free(j.cancel);
+    assert(fs_unlink(log));assert(fs_unlink(py));assert(fs_rmdir(bin));assert(fs_rmdir(venv));assert(fs_rmdir(script_dir));assert(fs_rmdir(j.root));
+    puts("PASS subprocess Unicode arguments, error propagation and process-group cancellation");
+}
 int main(void){
     fs_init();wchar_t w[128],error[FS_ERROR]={0};char text[512];
     const char *input="한글 사진 🦊.glb";
@@ -25,5 +44,5 @@ int main(void){
     assert(p.rgba[0]>240&&p.rgba[2]<15&&p.rgba[8]<15&&p.rgba[10]>240);
     photo_free(&p);unlink("test-orientation.ppm");
 #endif
-    (void)error;puts("PASS UTF-8 paths, atomic no-overwrite move, SHA-256, cancellation and image orientation");return 0;
+    subprocess_test();(void)error;puts("PASS UTF-8 paths, atomic no-overwrite move, SHA-256, cancellation and image orientation");return 0;
 }

@@ -15,6 +15,7 @@ import json
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "vendor" / "triposr"))
+from ai.device import inference_device
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "4")
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
@@ -33,7 +34,7 @@ class Captioner:
         directory = None
         for name in ("config.json", "preprocessor_config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "vocab.txt", "pytorch_model.bin"):
             directory = cached_asset(BLIP, name, progress).parent
-        self.device = __import__("ai.device", fromlist=["inference_device"]).inference_device()
+        self.device = inference_device()
         self.processor = BlipProcessor.from_pretrained(directory, local_files_only=True)
         self.model = BlipForConditionalGeneration.from_pretrained(directory, local_files_only=True).to(self.device).eval()
 
@@ -96,7 +97,7 @@ def infer(args):
     from model_cache import cached_asset
     from tsr.system import TSR
 
-    device = __import__("ai.device", fromlist=["inference_device"]).inference_device()
+    device = inference_device()
     torch.set_num_threads(min(6, torch.get_num_threads()))
     progress(f"TripoSR 준비 중 · {device.upper()}")
     config = OmegaConf.load(cached_asset(TRIPOSR, "config.yaml", progress))
@@ -150,7 +151,7 @@ def depth(args):
     for name in ("config.json", "preprocessor_config.json", "model.safetensors"):
         directory = cached_asset(DEPTH, name, progress).parent
     processor = AutoImageProcessor.from_pretrained(directory, local_files_only=True)
-    device = __import__("ai.device", fromlist=["inference_device"]).inference_device()
+    device = inference_device()
     model = AutoModelForDepthEstimation.from_pretrained(directory, local_files_only=True).eval().to(device)
     image = read_rgba(args.input).convert("RGB")
     with torch.inference_mode():

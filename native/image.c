@@ -44,7 +44,7 @@ int photo_load(const wchar_t *path,Photo *p,wchar_t *error){
     CFDictionaryRef options=CFDictionaryCreate(NULL,keys,values,3,&kCFTypeDictionaryKeyCallBacks,&kCFTypeDictionaryValueCallBacks);CGImageRef image=CGImageSourceCreateThumbnailAtIndex(source,0,options);CFRelease(options);CFRelease(size);CFRelease(source);if(!image)goto fail;
     size_t w=CGImageGetWidth(image),h=CGImageGetHeight(image);p->rgba=calloc(w*h,4);CGColorSpaceRef colour=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
     CGContextRef context=p->rgba?CGBitmapContextCreate(p->rgba,w,h,8,w*4,colour,kCGImageAlphaPremultipliedLast|kCGBitmapByteOrder32Big):NULL;CGColorSpaceRelease(colour);
-    if(!context){CGImageRelease(image);goto fail;}CGContextTranslateCTM(context,0,(CGFloat)h);CGContextScaleCTM(context,1,-1);CGContextDrawImage(context,CGRectMake(0,0,w,h),image);CGContextRelease(context);CGImageRelease(image);
+    if(!context){CGImageRelease(image);goto fail;}CGContextDrawImage(context,CGRectMake(0,0,w,h),image);CGContextRelease(context);CGImageRelease(image);
     for(size_t i=0;i<w*h;i++){unsigned char *c=p->rgba+4*i;if(c[3]&&c[3]!=255)for(int k=0;k<3;k++)c[k]=(unsigned char)fmin(255,(c[k]*255+c[3]/2)/c[3]);}
     p->width=(uint32_t)w;p->height=(uint32_t)h;return 1;
 fail:photo_free(p);fs_error(error,L"사진을 읽을 수 없습니다. JPG 또는 PNG를 선택하세요.");return 0;

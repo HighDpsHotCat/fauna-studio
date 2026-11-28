@@ -1,5 +1,7 @@
 """Local BioCLIP inference using the published TreeOfLife-10M text embeddings."""
 
+from ai.device import inference_device
+
 import json
 from dataclasses import dataclass
 import re
@@ -44,7 +46,7 @@ class AnimalClassifier:
         names_path = cached_asset(DATA, "embeddings/txt_emb_species.json", progress)
         embeddings_path = cached_asset(DATA, "embeddings/txt_emb_species.npy", progress)
         progress("BioCLIP을 메모리에 불러오는 중")
-        self.device = __import__("ai.device", fromlist=["inference_device"]).inference_device()
+        self.device = inference_device()
         if self.device == "cpu":
             torch.set_num_threads(min(torch.get_num_threads(), 8))
         model = open_clip.create_model_from_pretrained(

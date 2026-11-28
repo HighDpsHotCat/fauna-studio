@@ -77,7 +77,7 @@ CPU 추론은 오래 걸릴 수 있습니다. 품질 320에서 메모리가 부�
 
 ## 확인 범위와 남은 작업
 
-GitHub Actions는 Apple Silicon·Intel macOS에서 앱과 C CLI를 빌드하고 C 회귀 테스트, 예제 GLB 읽기, STL·STEP·3MF 변환, AI 의존성 설치·가져오기를 검사합니다. 실행 기록은 [Actions](https://github.com/HighDpsHotCat/fauna-studio/actions)에 있습니다. 모델 가중치를 내려받는 전체 사진→3D 생성 및 실제 Mac 화면의 사용성은 이 자동 검사에 포함하지 않습니다.
+GitHub Actions는 Apple Silicon·Intel macOS에서 앱과 C CLI를 빌드하고 네이티브 창 실행·예제 표시, C 회귀 테스트, 예제 GLB 읽기, STL·STEP·3MF 변환, AI 의존성 설치·가져오기를 검사합니다. 실행 기록은 [Actions](https://github.com/HighDpsHotCat/fauna-studio/actions)에 있습니다. 모델 가중치를 내려받는 전체 사진→3D 생성 및 실제 Mac 화면의 사용성은 이 자동 검사에 포함하지 않습니다.
 
 현재 모델링 보완은 개발 중입니다. 한 장의 사진만으로 눈·코·입의 측면 깊이, 겹친 발가락, 가려진 다리를 정확히 복원할 수 없으며 참고 사진을 결합해도 목 접합부와 측면 색상 늘어짐 등이 남을 수 있습니다. 이번 macOS 분리는 기존 형상 처리 코드를 옮긴 작업이며 이런 품질 문제가 모두 해결됐다는 의미는 아닙니다.
 
