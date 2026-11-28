@@ -59,6 +59,16 @@ int mesh_read_raw(const wchar_t *path,Mesh *m,wchar_t *error){
     }
     for(uint32_t i=0;i<h[1];i++)if(fread(m->vertices[i].color,1,4,f)!=4)goto bad;
     if(fread(m->triangles,sizeof(Triangle),h[2],f)!=h[2]||fgetc(f)!=EOF)goto bad;
+    /* Marching cubes can emit a collapsed face after vertex welding. It has
+     * no surface area; discard it without weakening index/position checks. */
+    uint32_t kept=0;
+    for(uint32_t i=0;i<m->triangle_count;i++){
+        Triangle t=m->triangles[i];
+        if(t.v[0]>=m->vertex_count||t.v[1]>=m->vertex_count||t.v[2]>=m->vertex_count)goto bad;
+        if(t.v[0]==t.v[1]||t.v[1]==t.v[2]||t.v[0]==t.v[2])continue;
+        m->triangles[kept++]=t;
+    }
+    m->triangle_count=kept;
     fclose(f);if(!mesh_validate(m,error)){mesh_free(m);return 0;}
     mesh_normals(m);return 1;
 bad:if(f)fclose(f);mesh_free(m);fs_error(error,L"TripoSR 메시 결과를 읽을 수 없습니다.");return 0;

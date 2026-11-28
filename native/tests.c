@@ -35,6 +35,25 @@ static void closed(const Mesh *m){
     qsort(edges,n,sizeof(*edges),compare_edges);
     for(uint32_t i=0;i<n;i+=2){assert(i+1<n);assert(!compare_edges(edges+i,edges+i+1));assert(i+2==n||compare_edges(edges+i,edges+i+2));}free(edges);
 }
+static void raw_collapsed_faces(void){
+    const uint32_t h[3]={0x31534d46,4,6};
+    const float points[12]={0,0,0,1,0,0,0,1,0,0,0,1};
+    const unsigned char colors[16]={80,40,20,255,90,50,30,255,100,60,40,255,110,70,50,255};
+    const Triangle valid[6]={{{0,0,1}},{{0,2,1}},{{0,1,3}},{{2,2,2}},{{0,3,2}},{{1,2,3}}};
+    for(int scenario=0;scenario<4;scenario++){
+        Triangle faces[6];float positions[12];memcpy(faces,valid,sizeof(faces));memcpy(positions,points,sizeof(positions));
+        if(scenario==1)faces[0]=(Triangle){{99,99,0}};
+        if(scenario==2)for(int i=0;i<6;i++)faces[i]=(Triangle){{0,0,0}};
+        if(scenario==3)positions[0]=NAN;
+        FILE *f=fs_wfopen(L"test-collapsed.raw",L"wb");assert(f);
+        assert(fwrite(h,4,3,f)==3&&fwrite(positions,4,12,f)==12&&fwrite(colors,1,16,f)==16&&fwrite(faces,sizeof(Triangle),6,f)==6);assert(!fclose(f));
+        Mesh m={0};wchar_t error[FS_ERROR]={0};int ok=mesh_read_raw(L"test-collapsed.raw",&m,error);
+        if(scenario){assert(!ok&&!m.vertices&&!m.triangles&&error[0]);}
+        else{assert(ok&&m.triangle_count==4&&m.vertex_count==4);closed(&m);assert(!memcmp(m.vertices[1].color,colors+4,4));assert(m.vertices[1].p[2]==-1);}
+        mesh_free(&m);assert(fs_unlink(L"test-collapsed.raw"));
+    }
+    puts("PASS raw collapsed-face cleanup; invalid indices, empty surface and NaN remain rejected");
+}
 static void exports(const Mesh *mesh){
     wchar_t error[FS_ERROR]={0},directory[FS_PATH],path[FS_PATH];FsId id;assert(FS_SUCCEEDED(fs_create_id(&id)));
     fs_wformat(directory,FS_PATH,L"test-export-%08lx",id.value);assert(fs_mkdir(directory,NULL));
@@ -324,6 +343,7 @@ int main(void){fs_init();
     mesh_free(&faceted);mesh_free(&faceted_read);fs_unlink(L"test-faceted.glb");
     puts("PASS flat face normals and constant face colors are exported and reopened without geometry changes");
     form_style(&a);
+    raw_collapsed_faces();
     Mesh adaptive={0};Quality preservation={0};int kept=0;
     assert(mesh_lowpoly(&a,&adaptive,300,NULL,&preservation,&kept,error));
     assert(preservation.silhouette_iou>=.94&&preservation.depth_rmse<=.035);
